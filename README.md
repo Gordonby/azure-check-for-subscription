@@ -1,0 +1,1 @@
+# azure-check-for-subscription
