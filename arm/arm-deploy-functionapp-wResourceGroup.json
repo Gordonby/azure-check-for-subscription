@@ -196,6 +196,9 @@
 								"[resourceId('Microsoft.Web/serverfarms', parameters('FunctionAppName'))]",
 								"[variables('storageResouceId')]"
 							],
+							"identity": {
+								"type": "SystemAssigned"
+							},
 							"properties": {
 								"serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('FunctionAppName'))]",
 								"use32BitWorkerProcess": true,
