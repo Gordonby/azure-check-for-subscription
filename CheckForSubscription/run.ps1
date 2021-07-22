@@ -29,7 +29,21 @@ if($projectId -eq $NULL) { Write-Error "ProjectId not provided"; Return }
 if($ADOPROJ -eq $NULL) { Write-Error "Project not provided"; Return }
 if($uri -eq $NULL) { Write-Error "URI not provided"; Return }
 
-$pat = $Request.Body.AuthToken
+#Acquire the PAT token from either body parameter or from the App Settings of the Azure Function
+if (-not $Request.Body.AuthToken) {
+    try{
+        Write-Verbose "Setting PAT token from AppSettings"
+        $patenv=ls env:APPSETTING_ADO_PAT
+        $pat =  $patenv.Value
+    } catch {
+        $failure = $_.Exception.Message
+        Write-Error "[ERROR] Failed to GET PAT token from AppSettings or Request Body. $failure"
+        Return
+    }
+} else {
+    Write-Verbose "Setting token from Request Body Parameter"
+    $pat = $Request.Body.AuthToken
+}
 if($pat.Length -lt 1) { Write-Error "WARNING: PAT Token is empty"; Return}
 
 #Base64 encode the PAT token, ready for a HTTP request header
@@ -49,67 +63,74 @@ if($uri -like "https://dev.azure.com/*") {
 }
 Write-Verbose "Using ADO Org: $ADOORG"
 
-Write-Host "Getting build $BUILDID"
-$BuildURL="$baseApiUrl/build/builds/$($BUILDID)?api-version=6.0"
-Write-Verbose "Calling $BuildURL"
-$buildresponse=Invoke-RestMethod -Uri $BuildURL -Headers @{Authorization = "Basic {0}" -f $base64AuthInfo} -Method Get
+#Write-Host "Getting build $BUILDID"
+#$BuildURL="$baseApiUrl/build/builds/$($BUILDID)?api-version=6.0"
+#Write-Verbose "Calling $BuildURL"
+#$buildresponse=Invoke-RestMethod -Uri $BuildURL -Headers @{Authorization = "Basic {0}" -f $base64AuthInfo} -Method Get
 #Write-Output $buildresponse
 
 Write-Host "Getting build Artifacts for build $BUILDID"
 $ArtifactListURL="$baseApiUrl/build/builds/$($BUILDID)/artifacts?api-version=6.0"
-Write-Output "Calling $ArtifactListURL"
+Write-Verbose "Calling $ArtifactListURL"
 $artifactListReponse=Invoke-RestMethod -Uri $ArtifactListURL -Headers @{Authorization = "Basic {0}" -f $base64AuthInfo} -Method Get
-Write-Output $artifactListReponse
+#Write-Output $artifactListReponse
 
-Write-Output $artifactListReponse.count
-
-if ($artifactListReponse.count =1) {
-    $artifactname=$artifactListReponse[0].name
-} else {
-    Write-Error "$($artifactListReponse.count) artifacts found. Expected 1."
+if ($artifactListReponse.count -eq 0) {
+    Write-Error "No artifacts found on pipeline build $BUILDID"; Return
 }
 
-Write-Host "Getting build Artifact: $artifactname"
-$ArtifactURL="$baseApiUrl/build/builds/$($BUILDID)/artifacts?artifactName=$($artifactname)&api-version=6.0"
-Write-host "Calling $ArtifactURL"
-$artifactReponse=Invoke-RestMethod -Uri $ArtifactURL -Headers @{Authorization = "Basic {0}" -f $base64AuthInfo} -Method Get
-#Write-Output $artifactReponse
+if ($artifactListReponse.count =1) {
+    $artifactname=$artifactListReponse.value[0].name
+} else {
+    Write-Error "$($artifactListReponse.count) artifacts found. Expected 1."; Return
+}
 
-$downloadUrl=$artifactReponse.resource.downloadUrl
-Write-Host "Downloading artifact from $downloadUrl"
+#Write-Host "Getting build Artifact: $artifactname"
+#$ArtifactURL="$baseApiUrl/build/builds/$($BUILDID)/artifacts?artifactName=$($artifactname)&api-version=6.0"
+#Write-host "Calling $ArtifactURL"
+#$artifactReponse=Invoke-RestMethod -Uri $ArtifactURL -Headers @{Authorization = "Basic {0}" -f $base64AuthInfo} -Method Get
+#Write-Output $artifactReponse
+#$downloadUrl=$artifactReponse.resource.downloadUrl
+
+$downloadUrl=$artifactListReponse.value[0].resource.downloadUrl
+Write-Verbose "Downloading artifact from $downloadUrl"
 $dlReponse=Invoke-RestMethod -Uri $downloadUrl -Headers @{Authorization = "Basic {0}" -f $base64AuthInfo} -Method Get -OutFile download.zip
 
 if (test-path download.zip) {
-    Write-Output "Expanding zip file"
-    Expand-Archive -path download.zip -destinationPath ./zipout -force
+    Write-Verbose "Expanding zip file"
+    $zippath=join-path $env:TEMP (new-guid).guid "zipout"
+    Expand-Archive -path download.zip -destinationPath $zippath -force
 
-    if (test-path ./zipout/drop/subscriptionname.txt) {
-        Write-Host "Parsing subscriptionname.txt"
-        $subname=Get-Content ./zipout/drop/subscriptionname.txt -raw
-        Write-Output "Subscription Name: $subname"
+    $artifactFilePath="drop/subscriptionname.json"
+    $jsonfilepath=join-path $zippath $artifactFilePath
+    if (test-path $jsonfilepath) {
+        Write-Verbose "Parsing subscriptionname.json"
+        $subnamejson=Get-Content $jsonfilepath -raw | ConvertFrom-Json
+        $subname=$subnamejson.Subscription
+        Write-Output "Artifact Subscription Name: $subname"
     } else {
-        Write-Error "Could not find file subscriptionname.txt in downloaded artifact"
+        Write-Error "Could not find file $artifactFilePath in downloaded artifact"; Return
     }
-    #Get-ChildItem -Path ./zipout/drop
 } else {
-    Write-Error "Could not find downloaded artifact"
+    Write-Error "Could not find downloaded artifact"; Return
 }
 
 #Now use Azure cmdlets to see if the subscription has been created
-Write-Host "Connecting to Azure"
-#Connect-AzAccount --identity
-$subSearch=Get-AzSubscription -SubscriptionName 'shanepe' -ErrorAction SilentlyContinue
+Write-Host "Searching Azure for Subscription $subname"
+$subSearch=Get-AzSubscription -SubscriptionName $subname
 
-if ($subSearch -eq $Null) {
-    Write-Output $subSearch
+if ($subSearch -ne $Null) {
+    Write-Verbose "Found subscription $subname"
+    Write-Verbose $subSearch
 
     $returnObj = New-Object PSObject -Property ([Ordered]@{subName=$subName; subfound=$true; subId=$subSearch.Id; subState=$subSearch.State })
 } else {
+    Write-Output "Not Found subscription $subname try again later"
     $subId = ""
-    $returnObj = New-Object PSObject -Property ([Ordered]@{subName=$subName; subfound=$false; subId=$subId })
+    $returnObj = New-Object PSObject -Property ([Ordered]@{subName=$subName.tostring(); subfound=$false; subId=$subId })
 }
 
-Write-Verbose $returnObj
+Write-Host $returnObj
 
 #Any cleanup
 $pat = $NULL
