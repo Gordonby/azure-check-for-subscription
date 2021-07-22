@@ -63,12 +63,6 @@ if($uri -like "https://dev.azure.com/*") {
 }
 Write-Verbose "Using ADO Org: $ADOORG"
 
-#Write-Host "Getting build $BUILDID"
-#$BuildURL="$baseApiUrl/build/builds/$($BUILDID)?api-version=6.0"
-#Write-Verbose "Calling $BuildURL"
-#$buildresponse=Invoke-RestMethod -Uri $BuildURL -Headers @{Authorization = "Basic {0}" -f $base64AuthInfo} -Method Get
-#Write-Output $buildresponse
-
 Write-Host "Getting build Artifacts for build $BUILDID"
 $ArtifactListURL="$baseApiUrl/build/builds/$($BUILDID)/artifacts?api-version=6.0"
 Write-Verbose "Calling $ArtifactListURL"
@@ -84,13 +78,6 @@ if ($artifactListReponse.count =1) {
 } else {
     Write-Error "$($artifactListReponse.count) artifacts found. Expected 1."; Return
 }
-
-#Write-Host "Getting build Artifact: $artifactname"
-#$ArtifactURL="$baseApiUrl/build/builds/$($BUILDID)/artifacts?artifactName=$($artifactname)&api-version=6.0"
-#Write-host "Calling $ArtifactURL"
-#$artifactReponse=Invoke-RestMethod -Uri $ArtifactURL -Headers @{Authorization = "Basic {0}" -f $base64AuthInfo} -Method Get
-#Write-Output $artifactReponse
-#$downloadUrl=$artifactReponse.resource.downloadUrl
 
 $downloadUrl=$artifactListReponse.value[0].resource.downloadUrl
 Write-Verbose "Downloading artifact from $downloadUrl"
