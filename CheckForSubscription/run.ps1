@@ -113,7 +113,7 @@ if ($subSearch -ne $Null) {
     $tags = Get-AzTag -ResourceId /subscriptions/$subSearch
     Write-Output $tags
 
-    $returnObj = New-Object PSObject -Property ([Ordered]@{subName=$subName; subfound=$true; subId=$subSearch.Id; subState=$subSearch.State, tags=$tags.Properties.TagsProperty })
+    $returnObj = New-Object PSObject -Property ([Ordered]@{subName=$subName; subfound=$true; subId=$subSearch.Id; subState=$subSearch.State; tags=$tags.Properties.TagsProperty })
 } else {
     Write-Output "Not Found subscription $subname try again later"
     $subId = ""
