@@ -12,4 +12,18 @@ The Azure Function uses a system assigned managed identity. This identity needs 
 
 TODO.
 
+### Azure DevOps Approval Gate
+
+#### The success criteria
+
+For a really simple check, on whether the subscription was found, use this formula to check for *Subscription Found*.
+```
+eq(root['subfound'], 'true')
+```
+
+For a more advanced check, based on *Subscription Tag value*
+```
+eq(jsonpath('$.tags.Readiness'), 'Ready')
+```
+
 [![Deploy To Azure](https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/1-CONTRIBUTION-GUIDE/images/deploytoazure.svg?sanitize=true)](https://ms.portal.azure.com/?feature.customportal=false#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FGordonby%2Fazure-check-for-subscription%2Fmain%2Farm%2Farm-deploy-functionapp-wResourceGroup.json)
