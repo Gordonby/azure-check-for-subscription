@@ -10,9 +10,32 @@ The Azure Function uses a system assigned managed identity. This identity needs 
 
 ## Instructions
 
-TODO.
+### Deploying the Azure Function
+
+[![Deploy To Azure](https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/1-CONTRIBUTION-GUIDE/images/deploytoazure.svg?sanitize=true)](https://ms.portal.azure.com/?feature.customportal=false#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FGordonby%2Fazure-check-for-subscription%2Fmain%2Farm%2Farm-deploy-functionapp-wResourceGroup.json)
+
+### Role Assignment
+
+The Azure Function needs the capability to query for subscriptions at the given scope. The built-in role of least priveledge here is Reader, but you may choose to create a custome role to narrow this assignment further.
 
 ### Azure DevOps Approval Gate
+
+Create an Environment in Azure DevOps, adding an Azure Function Approval and completing the dialog with
+1. Function URL
+2. Function authentication code
+3. Headers
+4. Body
+```json
+{
+"AuthToken": "$(system.AccessToken)",
+"URI": "$(System.CollectionUri)", 
+"ProjectId": "$(system.TeamProjectId)",
+"Project":"$(System.TeamProject)",
+"BuildId": "$(Build.BuildId)"
+}
+```
+5. Success Criteria
+6. Timeout 
 
 #### The success criteria
 
@@ -26,4 +49,4 @@ For a more advanced check, based on *Subscription Tag value*
 eq(jsonpath('$.tags.Readiness'), 'Ready')
 ```
 
-[![Deploy To Azure](https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/1-CONTRIBUTION-GUIDE/images/deploytoazure.svg?sanitize=true)](https://ms.portal.azure.com/?feature.customportal=false#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FGordonby%2Fazure-check-for-subscription%2Fmain%2Farm%2Farm-deploy-functionapp-wResourceGroup.json)
+
