@@ -49,4 +49,4 @@ For a more advanced check, based on *Subscription Tag value*
 eq(jsonpath('$.tags.Readiness'), 'Ready')
 ```
 
-
+![azure devops gate screengrab](docassets/ado-gate.png)
