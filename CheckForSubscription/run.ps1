@@ -16,12 +16,14 @@ $buildId = $Request.Body.buildId
 $projectId = $Request.Body.ProjectId
 $ADOPROJ = $Request.Body.Project
 $uri = $Request.Body.URI
+$checkforResType = $Request.Body.checkforResType
 
 # Write some of the parameters to the logs
 Write-Verbose "Received BuildId: $buildId"
 Write-Verbose "Received Uri: $uri"
 Write-Verbose "Received project: $ADOPROJ"
 Write-Verbose "Received projectId: $projectId"
+Write-Verbose "Received atleastOneJmes: $atleastOneJmes"
 
 #Basic validation of passed parameters
 if($buildId -eq $NULL) { Write-Error "buildId not provided"; Return }
@@ -112,8 +114,21 @@ if ($subSearch -ne $Null) {
     
     $tags = Get-AzTag -ResourceId /subscriptions/$subSearch
     Write-Output $tags
-
-    $returnObj = New-Object PSObject -Property ([Ordered]@{subName=$subName; subfound=$true; subId=$subSearch.Id; subState=$subSearch.State; tags=$tags.Properties.TagsProperty })
+    
+    if ($checkforResType -eq $NULL) {
+        $returnObj = New-Object PSObject -Property ([Ordered]@{subName=$subName; subfound=$true; subId=$subSearch.Id; subState=$subSearch.State; tags=$tags.Properties.TagsProperty })
+    } else { #Looks like we have criteria to check
+        Set-AzContext -SubscriptionId $subSearch.Id
+        $resourcesOfType=Get-AzResource -ResourceType $checkforResType
+        
+        if ($resourcesOfType.length > 1) {
+            $returnObj = New-Object PSObject -Property ([Ordered]@{subName=$subName; subfound=$true; subId=$subSearch.Id; subState=$subSearch.State; tags=$tags.Properties.TagsProperty; resCount=$resourcesOfType.length })
+        } else {
+            Write-Output "Found subscription $subname but no resources of type $checkforResType"
+            $subId = ""
+            $returnObj = New-Object PSObject -Property ([Ordered]@{subName=$subName.tostring(); subfound=$false; subId=$subId })
+        }
+    } 
 } else {
     Write-Output "Not Found subscription $subname try again later"
     $subId = ""
